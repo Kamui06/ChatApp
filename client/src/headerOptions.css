@@ -1,0 +1,53 @@
+/* ===== Backdrop ===== */
+.header-options-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 999;
+}
+
+/* ===== Menu ===== */
+.header-options-menu {
+  position: fixed;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  min-width: 200px;
+  overflow: hidden;
+  animation: headerOptionsPopIn 0.12s ease-out;
+}
+
+/* ===== Menu items ===== */
+.header-options-item {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: white;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.1s;
+}
+
+.header-options-item:hover {
+  background: #f3f4f6;
+}
+
+.header-options-item.danger {
+  color: #ef4444;
+  border-top: 1px solid #f3f4f6;
+}
+
+.header-options-item.danger:hover {
+  background: #fef2f2;
+}
+
+/* ===== Animation ===== */
+@keyframes headerOptionsPopIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}

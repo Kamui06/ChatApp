@@ -1,0 +1,344 @@
+/* ===== Sidebar container ===== */
+.sidebar {
+  height: 100%;
+  background: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.sidebar.mobile {
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  transition: transform 0.25s ease;
+}
+
+.sidebar.mobile.open {
+  transform: translateX(0);
+}
+
+.sidebar.mobile.closed {
+  transform: translateX(-100%);
+}
+
+/* ===== Mobile close button ===== */
+.sidebar-mobile-close-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px 0;
+}
+
+.sidebar-mobile-close-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+/* ===== Profile header ===== */
+.sidebar-profile {
+  padding: 16px;
+  border-bottom: 1px solid #2d2d44;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-profile-label {
+  color: #a5b4fc;
+  font-size: 11px;
+  margin: 0;
+}
+
+.sidebar-profile-name {
+  color: white;
+  font-weight: 600;
+  margin: 2px 0 0;
+  font-size: 15px;
+}
+
+.sidebar-inbox-btn {
+  position: relative;
+  background: #2d2d44;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.sidebar-inbox-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== Search ===== */
+.sidebar-search-wrapper {
+  padding: 12px 16px;
+  position: relative;
+}
+
+.sidebar-search-input-wrapper {
+  position: relative;
+}
+
+.sidebar-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.sidebar-search-input {
+  width: 100%;
+  padding: 9px 30px 9px 30px;
+  border-radius: 8px;
+  border: 1px solid #2d2d44;
+  background: #0f0f1a;
+  color: white;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.sidebar-search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* ===== Search results dropdown ===== */
+.sidebar-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 16px;
+  right: 16px;
+  background: #0f0f1a;
+  border: 1px solid #2d2d44;
+  border-radius: 8px;
+  z-index: 100;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.sidebar-search-message {
+  color: #6b7280;
+  font-size: 13px;
+  padding: 10px 14px;
+  margin: 0;
+}
+
+.sidebar-search-result {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #2d2d44;
+}
+
+.sidebar-search-result-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #6366f1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sidebar-search-result-name {
+  color: white;
+  font-size: 13px;
+  flex: 1;
+}
+
+.sidebar-sent-label {
+  font-size: 11px;
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.sidebar-invite-btn {
+  font-size: 11px;
+  color: white;
+  background: #6366f1;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.sidebar-request-error {
+  color: #ef4444;
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+/* ===== Chats label ===== */
+.sidebar-chats-label {
+  color: #6b7280;
+  font-size: 11px;
+  margin: 0;
+  padding: 4px 16px 6px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ===== Contact list ===== */
+.sidebar-contact-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar-empty-hint {
+  color: #4b5563;
+  font-size: 13px;
+  padding: 8px 16px;
+  line-height: 1.6;
+}
+
+.sidebar-contact-row {
+  padding: 10px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.sidebar-contact-row:hover {
+  background: #16213e;
+}
+
+.sidebar-contact-row.selected {
+  background: #2d2d44;
+}
+
+.sidebar-contact-row.selected:hover {
+  background: #2d2d44;
+}
+
+.sidebar-contact-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #6366f1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  position: relative;
+}
+
+.sidebar-contact-status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #1a1a2e;
+}
+
+.sidebar-contact-status-dot.online {
+  background: #22c55e;
+}
+
+.sidebar-contact-status-dot.offline {
+  background: #6b7280;
+}
+
+.sidebar-contact-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-contact-name {
+  color: white;
+  font-size: 14px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-contact-status-text {
+  font-size: 11px;
+  margin: 0;
+}
+
+.sidebar-contact-status-text.online {
+  color: #22c55e;
+}
+
+.sidebar-contact-status-text.offline {
+  color: #6b7280;
+}
+
+.sidebar-remove-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+
+/* ===== Logout ===== */
+.sidebar-logout-btn {
+  margin: 16px;
+  padding: 10px 0;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ===== Resize handle ===== */
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+}

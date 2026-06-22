@@ -1,0 +1,208 @@
+/* ===== Page ===== */
+.inbox-page {
+  min-height: 100vh;
+  background: #f0f2f5;
+  font-family: sans-serif;
+}
+
+.inbox-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: #9ca3af;
+  font-family: sans-serif;
+}
+
+/* ===== Top bar ===== */
+.inbox-topbar {
+  background: #1a1a2e;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.inbox-back-btn {
+  background: #2d2d44;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-title {
+  color: white;
+  margin: 0;
+  font-size: 18px;
+}
+
+/* ===== Content wrapper ===== */
+.inbox-content {
+  max-width: 600px;
+  margin: 32px auto;
+  padding: 0 16px;
+}
+
+/* ===== Tabs ===== */
+.inbox-tabs {
+  display: flex;
+  background: white;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.inbox-tab {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.inbox-tab.active {
+  background: #6366f1;
+  color: white;
+}
+
+.inbox-tab-badge {
+  margin-left: 8px;
+  background: #ef4444;
+  color: white;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.inbox-tab-badge.active {
+  background: white;
+  color: #6366f1;
+}
+
+/* ===== Loading / empty states ===== */
+.inbox-loading-state {
+  text-align: center;
+  color: #9ca3af;
+  padding: 40px;
+}
+
+.inbox-empty-state {
+  text-align: center;
+  background: white;
+  border-radius: 12px;
+  padding: 48px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.inbox-empty-state p {
+  color: #9ca3af;
+  font-size: 15px;
+  margin: 0;
+}
+
+/* ===== Request card ===== */
+.inbox-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.inbox-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.inbox-avatar.incoming {
+  background: #6366f1;
+}
+
+.inbox-avatar.outgoing {
+  background: #8b5cf6;
+}
+
+.inbox-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.inbox-card-name {
+  margin: 0;
+  font-weight: 600;
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.inbox-card-meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* ===== Actions ===== */
+.inbox-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.inbox-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.inbox-btn.accept {
+  background: #6366f1;
+  color: white;
+}
+
+.inbox-btn.decline {
+  background: #f3f4f6;
+  color: #ef4444;
+}
+
+.inbox-btn.cancel {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 8px 14px;
+}
+
+/* ===== Pending badge (outgoing tab) ===== */
+.inbox-pending-badge {
+  font-size: 11px;
+  color: #f59e0b;
+  background: #fef3c7;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  margin-right: 8px;
+}

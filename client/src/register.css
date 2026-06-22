@@ -1,0 +1,107 @@
+/* ===== Page ===== */
+.register-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #f0f2f5;
+}
+
+/* ===== Card ===== */
+.register-card {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  width: 360px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.register-title {
+  text-align: center;
+  margin-bottom: 24px;
+  color: #1a1a2e;
+}
+
+/* ===== Inputs ===== */
+.register-input {
+  width: 100%;
+  padding: 10px 14px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* Confirm password wrapper — needs relative positioning for the correct/incorrect */
+.register-confirm-wrapper {
+  position: relative;
+}
+
+.register-confirm-input {
+  padding-right: 36px;
+  border-color: #ddd;
+}
+
+.register-confirm-input.match {
+  border-color: #22c55e;
+}
+
+.register-confirm-input.mismatch {
+  border-color: #ef4444;
+}
+
+.register-match-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+}
+
+/* ===== Hint text ===== */
+.register-hint {
+  font-size: 12px;
+  margin: 4px 0 0 4px;
+}
+
+.register-hint.match {
+  color: #22c55e;
+}
+
+.register-hint.mismatch {
+  color: #ef4444;
+}
+
+/* ===== Button ===== */
+.register-button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  color: white;
+  background: #d1d5db;
+  cursor: not-allowed;
+}
+
+.register-button.enabled {
+  background: #6366f1;
+  cursor: pointer;
+}
+
+/* ===== Error / link ===== */
+.register-error {
+  color: red;
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #666;
+}
