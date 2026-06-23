@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "./api";
 import { socket } from "./socket";
 import ConfirmDialog from "./confirmDialogue";
 import "./inbox.css";
@@ -24,8 +24,8 @@ export default function Inbox() {
     setLoading(true);
     try {
       const [inc, out] = await Promise.all([
-        axios.get(`/api/requests/inbox/${me._id}`),
-        axios.get(`/api/requests/sent/${me._id}`)
+        api.get(`/api/requests/inbox/${me._id}`),
+        api.get(`/api/requests/sent/${me._id}`)
       ]);
       setIncoming(inc.data);
       setOutgoing(out.data);
@@ -47,7 +47,7 @@ export default function Inbox() {
 
   const accept = async (requestId) => {
     try {
-      await axios.post(`/api/requests/accept/${requestId}`);
+      await api.post(`/api/requests/accept/${requestId}`);
       setIncoming(prev => prev.filter(r => r._id !== requestId));
     } catch (err) {
       console.error(err);
@@ -56,7 +56,7 @@ export default function Inbox() {
 
   const decline = async (requestId) => {
     try {
-      await axios.post(`/api/requests/decline/${requestId}`);
+      await api.post(`/api/requests/decline/${requestId}`);
       setIncoming(prev => prev.filter(r => r._id !== requestId));
     } catch (err) {
       console.error(err);
@@ -65,7 +65,7 @@ export default function Inbox() {
 
   const cancel = async (requestId) => {
     try {
-      await axios.delete(`/api/requests/cancel/${requestId}`);
+      await api.delete(`/api/requests/cancel/${requestId}`);
       setOutgoing(prev => prev.filter(r => r._id !== requestId));
     } catch (err) {
       console.error(err);

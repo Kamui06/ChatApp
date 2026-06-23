@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "./api";
 import { socket } from "./socket";
 import ConfirmDialog from "./confirmDialogue";
 import "./sidebar.css";
@@ -24,7 +24,7 @@ export default function Sidebar({
 
   const fetchInboxCount = useCallback(async () => {
     try {
-      const res = await axios.get(`/api/requests/count/${me._id}`);
+      const res = await api.get(`/api/requests/count/${me._id}`);
       setInboxCount(res.data.count);
     } catch {}
   }, [me._id]);
@@ -58,7 +58,7 @@ export default function Sidebar({
     searchTimeout.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await axios.get(`/api/contacts/search/${me._id}/${q.trim()}`);
+        const res = await api.get(`/api/contacts/search/${me._id}/${q.trim()}`);
         setSearchResults(res.data);
       } catch {
         setSearchResults([]);
@@ -71,7 +71,7 @@ export default function Sidebar({
   const sendRequest = async (user) => {
     setRequestError("");
     try {
-      await axios.post("/api/requests/send", {
+      await api.post("/api/requests/send", {
         senderId: me._id,
         receiverId: user._id
       });
@@ -92,7 +92,7 @@ export default function Sidebar({
     if (!confirmRemove) return;
     const contactId = confirmRemove._id;
     try {
-      await axios.delete("/api/contacts/remove", {
+      await api.delete("/api/contacts/remove", {
         data: { userId: me._id, contactId }
       });
       socket.emit("remove-contact", { removedUserId: contactId, byUserId: me._id });

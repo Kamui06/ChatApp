@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import axios from "axios";
+import api from "./api";
 import { socket } from "./socket";
 import Sidebar from "./sidebar";
 import Header from "./header";
@@ -88,7 +88,7 @@ export default function Chat() {
       setMessages(prev => (selectedUser?._id === removedByUserId ? [] : prev));
     });
 
-    axios.get(`/api/contacts/${me._id}`).then(r => setContacts(r.data));
+    api.get(`/api/contacts/${me._id}`).then(r => setContacts(r.data));
 
     return () => {
       socket.off("online-users");
@@ -115,7 +115,7 @@ export default function Chat() {
     setActiveMessage(null);
     setHeaderOptions(null);
     if (user) {
-      const res = await axios.get(`/api/messages/${me._id}/${user._id}`);
+      const res = await api.get(`/api/messages/${me._id}/${user._id}`);
       setMessages(res.data);
     }
   };
@@ -135,7 +135,7 @@ export default function Chat() {
     if (!text.trim() || !selectedUser) return;
     const msg = { senderId: me._id, receiverId: selectedUser._id, text };
     socket.emit("stop-typing", { senderId: me._id, receiverId: selectedUser._id });
-    const res = await axios.post("/api/messages", msg);
+    const res = await api.post("/api/messages", msg);
     socket.emit("send-message", { ...msg, _id: res.data._id });
     setMessages(prev => [...prev, res.data]);
     setText("");
@@ -143,7 +143,7 @@ export default function Chat() {
 
   const deleteForEveryone = async (messageId) => {
     try {
-      await axios.delete(`/api/messages/${messageId}/everyone`, { data: { userId: me._id } });
+      await api.delete(`/api/messages/${messageId}/everyone`, { data: { userId: me._id } });
       setMessages(prev => prev.filter(m => m._id !== messageId));
       socket.emit("delete-message-everyone", { messageId, receiverId: selectedUser._id });
     } catch (err) {
@@ -153,7 +153,7 @@ export default function Chat() {
 
   const deleteForMe = async (messageId) => {
     try {
-      await axios.delete(`/api/messages/${messageId}/me`, { data: { userId: me._id } });
+      await api.delete(`/api/messages/${messageId}/me`, { data: { userId: me._id } });
       setMessages(prev => prev.filter(m => m._id !== messageId));
     } catch (err) {
       console.error("Failed to delete for me:", err.response?.data || err.message);
@@ -171,7 +171,7 @@ export default function Chat() {
   const handleClearChat = async () => {
     if (!selectedUser) return;
     try {
-      await axios.delete(`/api/messages/clear/${me._id}/${selectedUser._id}`);
+      await api.delete(`/api/messages/clear/${me._id}/${selectedUser._id}`);
       setMessages([]);
       socket.emit("clear-chat", { receiverId: selectedUser._id });
       setHeaderOptions(null);
@@ -188,7 +188,7 @@ export default function Chat() {
   const confirmRemoveUser = async () => {
     if (!selectedUser) return;
     try {
-      await axios.delete("/api/contacts/remove", {
+      await api.delete("/api/contacts/remove", {
         data: { userId: me._id, contactId: selectedUser._id }
       });
       socket.emit("remove-contact", { removedUserId: selectedUser._id, byUserId: me._id });

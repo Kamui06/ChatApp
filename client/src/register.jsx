@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import api from "./api";
 import { useNavigate, Link } from "react-router-dom";
 import "./register.css";
 
@@ -23,7 +23,7 @@ export default function Register() {
     }
 
     try {
-      await axios.post("/api/auth/register", {
+      await api.post("/api/auth/register", {
         username: form.username,
         password: form.password
       });
