@@ -11,7 +11,7 @@ const server = http.createServer(app);
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://chatapp-mkyv.onrender.com" // ← add this after deploying to Vercel
+  "https://chatapp-coral-chi.vercel.app/" // ← add this after deploying to Vercel
 ];
 
 const io = new Server(server, {
