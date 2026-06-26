@@ -39,27 +39,27 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-  const handleVisibilityChange = () => {
-    if (document.visibilityState === "visible") {
-      if (!socket.connected) {
-        socket.connect();
-      }
-      if (me) {
-        socket.emit("user-online", me._id);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (!socket.connected) {
+          socket.connect();
+        }
+        if (me) {
+          socket.emit("user-online", me._id);
 
-        // Re-fetch the current conversation in case messages were missed while backgrounded
-        if (selectedUser) {
-          api.get(`/api/messages/${me._id}/${selectedUser._id}`).then(res => {
-            setMessages(res.data);
-          });
+          // Re-fetch the current conversation in case messages were missed while backgrounded
+          if (selectedUser) {
+            api.get(`/api/messages/${me._id}/${selectedUser._id}`).then(res => {
+              setMessages(res.data);
+            });
+          }
         }
       }
-    }
-  };
+    };
 
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-}, [me, selectedUser]);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [me, selectedUser]);
 
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
@@ -67,6 +67,22 @@ export default function Chat() {
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
   }, []);
+
+  useEffect(() => {
+  if (!me) return;
+
+  const handleReconnect = () => {
+    socket.emit("user-online", me._id);
+    if (selectedUser) {
+      api.get(`/api/messages/${me._id}/${selectedUser._id}`).then(res => {
+        setMessages(res.data);
+      });
+    }
+  };
+
+  socket.on("reconnect", handleReconnect);
+  return () => socket.off("reconnect", handleReconnect);
+}, [me, selectedUser]);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
