@@ -30,7 +30,7 @@ app.use("/api/messages", require("./routes/messages"));
 app.use("/api/contacts", require("./routes/contacts"));
 app.use("/api/requests", require("./routes/requests"));
 
-// Socket.io — track online users
+// Socket.io - track online users
 const onlineUsers = new Map(); // userId -> socketId
 
 io.on("connection", (socket) => {
