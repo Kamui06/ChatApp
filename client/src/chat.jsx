@@ -14,11 +14,29 @@ const MOBILE_BREAKPOINT = 768;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 480;
 
-// Convert either a MongoDB ID string or populated user object to a string ID.
+// Convert MongoDB IDs or populated user objects into strings.
 const getId = (value) => {
   if (value === null || value === undefined) return "";
+
   return String(
     typeof value === "object" ? value._id : value
+  );
+};
+
+// Merge messages without adding duplicates.
+const mergeMessages = (...groups) => {
+  const messagesById = new Map();
+
+  groups.flat().forEach((message) => {
+    if (message?._id) {
+      messagesById.set(getId(message._id), message);
+    }
+  });
+
+  return Array.from(messagesById.values()).sort(
+    (a, b) =>
+      new Date(a.createdAt || 0).getTime() -
+      new Date(b.createdAt || 0).getTime()
   );
 };
 
@@ -39,12 +57,18 @@ export default function Chat() {
   const bottomRef = useRef(null);
   const typingTimeout = useRef(null);
   const isResizing = useRef(false);
+
+  // These refs keep event handlers up to date without reconnecting.
+  const selectedUserRef = useRef(null);
   const conversationRequest = useRef(0);
 
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < MOBILE_BREAKPOINT;
 
-  // Load logged-in user
+  // Keep the selected conversation available to persistent socket listeners.
+  selectedUserRef.current = selectedUser;
+
+  // Load logged-in user.
   useEffect(() => {
     try {
       const storedUser = JSON.parse(localStorage.getItem("user"));
@@ -55,75 +79,96 @@ export default function Chat() {
     }
   }, []);
 
-  // Main Socket.IO connection and event listeners
+  // =========================================================
+  // SOCKET.IO: ONE CONNECTION AND ONE SET OF LISTENERS PER USER
+  // =========================================================
+
   useEffect(() => {
     if (!me?._id) return;
 
     const myId = String(me._id);
-    const selectedUserId = getId(selectedUser?._id);
 
-    // Called on initial connection and every reconnection
+    // Register the user whenever the socket connects or reconnects.
     const handleConnect = () => {
       console.log("Socket connected:", socket.id);
 
-      // Register this user with the backend
       socket.emit("user-online", myId);
 
-      // Refresh the open conversation after reconnecting
-      if (selectedUserId) {
+      // Refresh the currently selected conversation after reconnecting.
+      const currentUser = selectedUserRef.current;
+
+      if (currentUser?._id) {
+        const currentUserId = getId(currentUser._id);
+
         api
-          .get(`/api/messages/${myId}/${selectedUserId}`)
+          .get(`/api/messages/${myId}/${currentUserId}`)
           .then((res) => {
-            setMessages(res.data);
+            if (
+              getId(selectedUserRef.current?._id) === currentUserId
+            ) {
+              setMessages((prev) =>
+                mergeMessages(res.data, prev)
+              );
+            }
           })
           .catch((err) => {
-            console.error("Failed to refresh messages:", err);
+            console.error("Reconnect message refresh failed:", err);
           });
       }
     };
 
-    const handleOnlineUsers = (ids) => {
-      setOnlineUsers(Array.isArray(ids) ? ids.map(String) : []);
+    const handleDisconnect = (reason) => {
+      console.log("Socket disconnected:", reason);
     };
 
-    // Receive messages in the currently selected conversation only
+    const handleConnectError = (err) => {
+      console.error("Socket connection error:", err.message);
+    };
+
+    // Update online users.
+    const handleOnlineUsers = (ids) => {
+      setOnlineUsers(
+        Array.isArray(ids) ? ids.map(String) : []
+      );
+    };
+
+    // Receive messages in the currently selected conversation.
     const handleReceiveMessage = (msg) => {
+      const currentUser = selectedUserRef.current;
+
+      if (!currentUser?._id) return;
+
       const senderId = getId(msg.senderId);
       const receiverId = getId(msg.receiverId);
+      const selectedId = getId(currentUser._id);
 
-      const belongsToSelectedChat =
-        selectedUserId &&
-        (
-          (senderId === selectedUserId && receiverId === myId) ||
-          (senderId === myId && receiverId === selectedUserId)
-        );
+      const belongsToCurrentChat =
+        (senderId === selectedId && receiverId === myId) ||
+        (senderId === myId && receiverId === selectedId);
 
-      if (!belongsToSelectedChat) return;
+      if (!belongsToCurrentChat) return;
 
-      setMessages((prev) => {
-        // Avoid adding the same message twice
-        const alreadyExists = prev.some(
-          (message) => getId(message._id) === getId(msg._id)
-        );
-
-        if (alreadyExists) return prev;
-
-        return [...prev, msg];
-      });
+      setMessages((prev) => mergeMessages(prev, [msg]));
     };
 
-    const handleTypingEvent = (senderId) => {
-      if (getId(senderId) === selectedUserId) {
+    // Typing indicator.
+    const handleTyping = (senderId) => {
+      if (
+        getId(selectedUserRef.current?._id) === getId(senderId)
+      ) {
         setIsTyping(true);
       }
     };
 
     const handleStopTyping = (senderId) => {
-      if (getId(senderId) === selectedUserId) {
+      if (
+        getId(selectedUserRef.current?._id) === getId(senderId)
+      ) {
         setIsTyping(false);
       }
     };
 
+    // Delete message for everyone.
     const handleMessageDeleted = (messageId) => {
       setMessages((prev) =>
         prev.filter(
@@ -132,64 +177,131 @@ export default function Chat() {
       );
     };
 
+    // Clear current conversation.
     const handleChatCleared = () => {
       setMessages([]);
     };
 
+    // Contact removed by another user.
     const handleContactRemoved = (removedByUserId) => {
-      const removedById = getId(removedByUserId);
+      const removedId = getId(removedByUserId);
 
       setContacts((prev) =>
-        prev.filter((contact) => getId(contact._id) !== removedById)
+        prev.filter(
+          (contact) => getId(contact._id) !== removedId
+        )
       );
 
-      if (selectedUserId === removedById) {
+      if (
+        getId(selectedUserRef.current?._id) === removedId
+      ) {
+        selectedUserRef.current = null;
         setSelectedUser(null);
         setMessages([]);
         setIsTyping(false);
       }
     };
 
-    // Register event listeners
+    // Register listeners before connecting.
     socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("connect_error", handleConnectError);
+
     socket.on("online-users", handleOnlineUsers);
     socket.on("receive-message", handleReceiveMessage);
-    socket.on("typing", handleTypingEvent);
+    socket.on("typing", handleTyping);
     socket.on("stop-typing", handleStopTyping);
     socket.on("message-deleted-everyone", handleMessageDeleted);
     socket.on("chat-cleared", handleChatCleared);
     socket.on("contact-removed", handleContactRemoved);
 
-    // Start the connection if it is not already connected
+    // Start the connection.
     if (!socket.connected) {
       socket.connect();
     } else {
-      // The socket was already connected before these listeners were added
+      // Socket was already connected.
       handleConnect();
     }
 
-    // Load contacts
+    // Load contacts.
     api
       .get(`/api/contacts/${myId}`)
-      .then((res) => setContacts(res.data))
+      .then((res) => {
+        setContacts(res.data);
+      })
       .catch((err) => {
         console.error("Failed to load contacts:", err);
       });
 
-    // Remove only the listeners registered by this effect
+    // Remove only this effect's listeners.
     return () => {
       socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("connect_error", handleConnectError);
+
       socket.off("online-users", handleOnlineUsers);
       socket.off("receive-message", handleReceiveMessage);
-      socket.off("typing", handleTypingEvent);
+      socket.off("typing", handleTyping);
       socket.off("stop-typing", handleStopTyping);
       socket.off("message-deleted-everyone", handleMessageDeleted);
       socket.off("chat-cleared", handleChatCleared);
       socket.off("contact-removed", handleContactRemoved);
+
+      // Do not disconnect the shared socket when switching chats.
+    };
+  }, [me]);
+
+  // =========================================================
+  // LOAD CONVERSATION WHEN SELECTED USER CHANGES
+  // =========================================================
+
+  useEffect(() => {
+    if (!me?._id || !selectedUser?._id) {
+      conversationRequest.current++;
+      setMessages([]);
+      setIsTyping(false);
+      return;
+    }
+
+    const requestId = ++conversationRequest.current;
+    const myId = getId(me._id);
+    const selectedId = getId(selectedUser._id);
+
+    setMessages([]);
+    setIsTyping(false);
+
+    api
+      .get(`/api/messages/${myId}/${selectedId}`)
+      .then((res) => {
+        // Ignore old requests if the user switched conversations.
+        if (requestId !== conversationRequest.current) return;
+
+        if (
+          getId(selectedUserRef.current?._id) !== selectedId
+        ) {
+          return;
+        }
+
+        // Merge with messages received while the request was running.
+        setMessages((prev) =>
+          mergeMessages(res.data, prev)
+        );
+      })
+      .catch((err) => {
+        if (requestId === conversationRequest.current) {
+          console.error("Failed to load conversation:", err);
+        }
+      });
+
+    return () => {
+      conversationRequest.current = requestId + 1;
     };
   }, [me, selectedUser]);
 
-  // Refresh messages when the browser tab becomes visible again
+  // =========================================================
+  // REFRESH WHEN THE USER RETURNS TO THE BROWSER TAB
+  // =========================================================
+
   useEffect(() => {
     if (!me?._id) return;
 
@@ -197,22 +309,37 @@ export default function Chat() {
       if (document.visibilityState !== "visible") return;
 
       if (!socket.connected) {
-        // The connect event will register the user and refresh the chat
+        // handleConnect registers the user and refreshes the conversation.
         socket.connect();
         return;
       }
 
-      if (selectedUser?._id) {
-        api
-          .get(`/api/messages/${me._id}/${selectedUser._id}`)
-          .then((res) => setMessages(res.data))
-          .catch((err) => {
-            console.error("Failed to refresh conversation:", err);
-          });
-      }
+      const currentUser = selectedUserRef.current;
+
+      if (!currentUser?._id) return;
+
+      const selectedId = getId(currentUser._id);
+
+      api
+        .get(`/api/messages/${me._id}/${selectedId}`)
+        .then((res) => {
+          if (
+            getId(selectedUserRef.current?._id) === selectedId
+          ) {
+            setMessages((prev) =>
+              mergeMessages(res.data, prev)
+            );
+          }
+        })
+        .catch((err) => {
+          console.error("Visibility refresh failed:", err);
+        });
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
 
     return () => {
       document.removeEventListener(
@@ -220,9 +347,12 @@ export default function Chat() {
         handleVisibilityChange
       );
     };
-  }, [me, selectedUser]);
+  }, [me]);
 
-  // Sidebar resizing
+  // =========================================================
+  // SIDEBAR RESIZING
+  // =========================================================
+
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
 
@@ -263,59 +393,71 @@ export default function Chat() {
     };
   }, []);
 
-  // Clear typing timeout when component unmounts
+  // =========================================================
+  // CLEANUP TYPING TIMEOUT
+  // =========================================================
+
   useEffect(() => {
     return () => {
       clearTimeout(typingTimeout.current);
     };
   }, []);
 
-  // Automatically scroll to the latest message
+  // Scroll to the latest message.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
   }, [messages]);
 
-  // Select a conversation and load its message history
-const handleSelectUser = async (user) => {
-  const requestId = ++conversationRequest.current;
+  // =========================================================
+  // SELECT CONVERSATION
+  // =========================================================
 
-  clearTimeout(typingTimeout.current);
+  const handleSelectUser = (user) => {
+    const previousUser = selectedUserRef.current;
 
-  setSelectedUser(user);
-  setIsTyping(false);
-  setActiveMessage(null);
-  setHeaderOptions(null);
+    clearTimeout(typingTimeout.current);
 
-  if (!user) {
-    setMessages([]);
-    return;
-  }
-
-  setMessages([]);
-
-  try {
-    const res = await api.get(
-      `/api/messages/${me._id}/${user._id}`
-    );
-
-    if (requestId === conversationRequest.current) {
-      setMessages(res.data);
+    // Tell the previous conversation that typing stopped.
+    if (previousUser?._id && me?._id) {
+      socket.emit("stop-typing", {
+        senderId: me._id,
+        receiverId: previousUser._id
+      });
     }
-  } catch (err) {
-    console.error("Failed to load conversation:", err);
-  }
-};
 
-  // Typing indicator
+    selectedUserRef.current = user;
+
+    setSelectedUser(user);
+    setIsTyping(false);
+    setActiveMessage(null);
+    setHeaderOptions(null);
+
+    if (!user) {
+      setMessages([]);
+    }
+
+    if (isMobile) {
+      setMobileSidebarOpen(false);
+    }
+  };
+
+  // =========================================================
+  // TYPING INDICATOR
+  // =========================================================
+
   const handleTyping = (e) => {
     const value = e.target.value;
     setText(value);
 
     if (!selectedUser) return;
 
+    const receiverId = selectedUser._id;
+
     socket.emit("typing", {
       senderId: me._id,
-      receiverId: selectedUser._id
+      receiverId
     });
 
     clearTimeout(typingTimeout.current);
@@ -323,18 +465,22 @@ const handleSelectUser = async (user) => {
     typingTimeout.current = setTimeout(() => {
       socket.emit("stop-typing", {
         senderId: me._id,
-        receiverId: selectedUser._id
+        receiverId
       });
     }, 1500);
   };
 
-  // Send message
+  // =========================================================
+  // SEND MESSAGE
+  // =========================================================
+
   const sendMessage = async () => {
     const messageText = text.trim();
 
     if (!messageText || !selectedUser) return;
 
     const receiverId = selectedUser._id;
+    const receiverIdString = getId(receiverId);
 
     try {
       clearTimeout(typingTimeout.current);
@@ -352,19 +498,17 @@ const handleSelectUser = async (user) => {
 
       const savedMessage = res.data;
 
-      // Add message to sender's screen
-      setMessages((prev) => {
-        const alreadyExists = prev.some(
-          (message) => getId(message._id) === getId(savedMessage._id)
-        );
-
-        if (alreadyExists) return prev;
-
-        return [...prev, savedMessage];
-      });
-
-      // Notify the recipient in real time
+      // Notify recipient through Socket.IO.
       socket.emit("send-message", savedMessage);
+
+      // Update sender's screen only if the same chat is still selected.
+      if (
+        getId(selectedUserRef.current?._id) === receiverIdString
+      ) {
+        setMessages((prev) =>
+          mergeMessages(prev, [savedMessage])
+        );
+      }
 
       setText("");
       setIsTyping(false);
@@ -376,7 +520,10 @@ const handleSelectUser = async (user) => {
     }
   };
 
-  // Delete message for everyone
+  // =========================================================
+  // DELETE MESSAGE FOR EVERYONE
+  // =========================================================
+
   const deleteForEveryone = async (messageId) => {
     if (!selectedUser) return;
 
@@ -389,7 +536,9 @@ const handleSelectUser = async (user) => {
       );
 
       setMessages((prev) =>
-        prev.filter((message) => getId(message._id) !== getId(messageId))
+        prev.filter(
+          (message) => getId(message._id) !== getId(messageId)
+        )
       );
 
       socket.emit("delete-message-everyone", {
@@ -404,7 +553,10 @@ const handleSelectUser = async (user) => {
     }
   };
 
-  // Delete message only for the current user
+  // =========================================================
+  // DELETE MESSAGE FOR ME
+  // =========================================================
+
   const deleteForMe = async (messageId) => {
     try {
       await api.delete(
@@ -415,7 +567,9 @@ const handleSelectUser = async (user) => {
       );
 
       setMessages((prev) =>
-        prev.filter((message) => getId(message._id) !== getId(messageId))
+        prev.filter(
+          (message) => getId(message._id) !== getId(messageId)
+        )
       );
     } catch (err) {
       console.error(
@@ -425,7 +579,10 @@ const handleSelectUser = async (user) => {
     }
   };
 
-  // Open message actions
+  // =========================================================
+  // MESSAGE ACTIONS
+  // =========================================================
+
   const handleMessageClick = (e, message, isMe) => {
     const rect = e.currentTarget.getBoundingClientRect();
 
@@ -439,7 +596,10 @@ const handleSelectUser = async (user) => {
     });
   };
 
-  // Clear conversation
+  // =========================================================
+  // CLEAR CHAT
+  // =========================================================
+
   const handleClearChat = async () => {
     if (!selectedUser) return;
 
@@ -463,34 +623,40 @@ const handleSelectUser = async (user) => {
     }
   };
 
-  // Open remove-contact confirmation
+  // =========================================================
+  // REMOVE CONTACT
+  // =========================================================
+
   const handleRemoveUser = () => {
     setHeaderOptions(null);
     setShowRemoveConfirm(true);
   };
 
-  // Confirm contact removal
   const confirmRemoveUser = async () => {
     if (!selectedUser) return;
+
+    const removedUserId = selectedUser._id;
 
     try {
       await api.delete("/api/contacts/remove", {
         data: {
           userId: me._id,
-          contactId: selectedUser._id
+          contactId: removedUserId
         }
       });
 
       socket.emit("remove-contact", {
-        removedUserId: selectedUser._id,
+        removedUserId,
         byUserId: me._id
       });
 
       setContacts((prev) =>
         prev.filter(
-          (contact) => getId(contact._id) !== getId(selectedUser._id)
+          (contact) => getId(contact._id) !== getId(removedUserId)
         )
       );
+
+      selectedUserRef.current = null;
 
       setSelectedUser(null);
       setMessages([]);
@@ -505,9 +671,17 @@ const handleSelectUser = async (user) => {
     }
   };
 
+  // =========================================================
+  // LOADING
+  // =========================================================
+
   if (!me) {
     return <div className="chat-loading">Loading...</div>;
   }
+
+  // =========================================================
+  // UI
+  // =========================================================
 
   return (
     <div className="chat-container">
@@ -530,7 +704,7 @@ const handleSelectUser = async (user) => {
         <button
           type="button"
           className="chat-mobile-backdrop"
-          aria-label="Close chat sidebar"
+          aria-label="Close navigation menu"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
@@ -557,20 +731,24 @@ const handleSelectUser = async (user) => {
             )}
 
             {messages.map((m, i) => {
-              const isMe = getId(m.senderId) === getId(me._id);
+              const isMe =
+                getId(m.senderId) === getId(me._id);
 
               return (
                 <div
                   key={m._id || i}
-                  className={`chat-message-row ${isMe ? "me" : "them"}`}
+                  className={`chat-message-row ${
+                    isMe ? "me" : "them"
+                  }`}
                 >
                   <button
                     type="button"
-                    onClick={(e) => handleMessageClick(e, m, isMe)}
-                    aria-label="Open message actions"
-                    className={`chat-bubble ${isMe ? "me" : "them"} ${
-                      isMobile ? "mobile" : ""
-                    }`}
+                    onClick={(e) =>
+                      handleMessageClick(e, m, isMe)
+                    }
+                    className={`chat-bubble ${
+                      isMe ? "me" : "them"
+                    } ${isMobile ? "mobile" : ""}`}
                   >
                     {m.text}
                   </button>
@@ -588,6 +766,7 @@ const handleSelectUser = async (user) => {
           </div>
 
           <div className="chat-input-bar">
+
             <input
               className="chat-input"
               value={text}
@@ -610,6 +789,7 @@ const handleSelectUser = async (user) => {
             >
               Send
             </button>
+
           </div>
         </div>
       ) : (
@@ -631,6 +811,7 @@ const handleSelectUser = async (user) => {
           <p className="subtitle">
             Search for users in the sidebar to add them
           </p>
+
         </div>
       )}
 
