@@ -11,31 +11,39 @@ const app = express();
 const server = http.createServer(app);
 
 // Allowed frontend origins
+
 const allowedOrigins = (
   process.env.CLIENT_URLS ||
   "http://localhost:3000,https://chatapp-coral-chi.vercel.app"
 )
   .split(",")
-  .map(origin => origin.trim().replace(/\/$/, ""))
+  .map(origin => {
+    const trimmedOrigin = origin.trim();
+    let end = trimmedOrigin.length;
+    while (end > 0 && trimmedOrigin.codePointAt(end - 1) === 47) end--;
+    return trimmedOrigin.slice(0, end);
+  })
   .filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests without an Origin header (e.g. server-to-server)
     if (!origin) return callback(null, true);
 
-    const normalizedOrigin = origin.replace(/\/$/, "");
+    let originEnd = origin.length;
+    while (originEnd > 0 && origin.codePointAt(originEnd - 1) === 47) originEnd--;
+    const normalizedOrigin = origin.slice(0, originEnd);
 
     if (allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
 
-    console.warn("Blocked origin:", origin);
-    return callback(new Error("Not allowed by CORS"));
+    console.error("CORS blocked origin:", origin);
+    return callback(new Error(`Origin not allowed: ${origin}`));
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true
 };
+
 
 app.use(cors(corsOptions));
 app.use(express.json());
