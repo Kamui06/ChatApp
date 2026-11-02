@@ -39,6 +39,7 @@ export default function Chat() {
   const bottomRef = useRef(null);
   const typingTimeout = useRef(null);
   const isResizing = useRef(false);
+  const conversationRequest = useRef(0);
 
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < MOBILE_BREAKPOINT;
@@ -275,38 +276,35 @@ export default function Chat() {
   }, [messages]);
 
   // Select a conversation and load its message history
-  const handleSelectUser = async (user) => {
-    clearTimeout(typingTimeout.current);
+const handleSelectUser = async (user) => {
+  const requestId = ++conversationRequest.current;
 
-    setSelectedUser(user);
-    setIsTyping(false);
-    setActiveMessage(null);
-    setHeaderOptions(null);
+  clearTimeout(typingTimeout.current);
 
-    if (!user) {
-      setMessages([]);
-      return;
-    }
+  setSelectedUser(user);
+  setIsTyping(false);
+  setActiveMessage(null);
+  setHeaderOptions(null);
 
+  if (!user) {
     setMessages([]);
+    return;
+  }
 
-    try {
-      const res = await api.get(
-        `/api/messages/${me._id}/${user._id}`
-      );
+  setMessages([]);
 
-      // Don't display an older request if the user switched chats
-      setMessages((prev) => {
-        if (getId(selectedUser?._id) !== getId(user._id)) {
-          return prev;
-        }
+  try {
+    const res = await api.get(
+      `/api/messages/${me._id}/${user._id}`
+    );
 
-        return res.data;
-      });
-    } catch (err) {
-      console.error("Failed to load conversation:", err);
+    if (requestId === conversationRequest.current) {
+      setMessages(res.data);
     }
-  };
+  } catch (err) {
+    console.error("Failed to load conversation:", err);
+  }
+};
 
   // Typing indicator
   const handleTyping = (e) => {
