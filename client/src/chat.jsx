@@ -527,8 +527,10 @@ const handleSelectUser = async (user) => {
       />
 
       {isMobile && mobileSidebarOpen && (
-        <div
+        <button
+          type="button"
           className="chat-mobile-backdrop"
+          aria-label="Close chat sidebar"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
@@ -562,14 +564,16 @@ const handleSelectUser = async (user) => {
                   key={m._id || i}
                   className={`chat-message-row ${isMe ? "me" : "them"}`}
                 >
-                  <div
+                  <button
+                    type="button"
                     onClick={(e) => handleMessageClick(e, m, isMe)}
+                    aria-label="Open message actions"
                     className={`chat-bubble ${isMe ? "me" : "them"} ${
                       isMobile ? "mobile" : ""
                     }`}
                   >
                     {m.text}
-                  </div>
+                  </button>
                 </div>
               );
             })}
@@ -591,7 +595,7 @@ const handleSelectUser = async (user) => {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  sendMessage();
+                  void sendMessage();
                 }
               }}
               placeholder={`Message ${selectedUser.username}...`}
@@ -601,7 +605,7 @@ const handleSelectUser = async (user) => {
               className={`chat-send-btn ${
                 text.trim() ? "active" : ""
               }`}
-              onClick={sendMessage}
+              onClick={() => void sendMessage()}
               disabled={!text.trim()}
             >
               Send
