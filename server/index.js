@@ -2,7 +2,7 @@
 require("dotenv").config();
 
 const express = require("express");
-const http = require("http");
+const http = require("node:http");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -10,29 +10,47 @@ const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
 
-// Frontend origins allowed to connect
+// Allowed frontend origins
 const allowedOrigins = (
   process.env.CLIENT_URLS ||
   "http://localhost:3000,https://chatapp-coral-chi.vercel.app"
 )
   .split(",")
-  .map(origin => origin.trim())
+  .map(origin => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-app.use(cors({
-  origin: allowedOrigins,
-  methods: ["GET", "POST", "PUT", "DELETE"]
-}));
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests without an Origin header (e.g. server-to-server)
+    if (!origin) return callback(null, true);
 
+    const normalizedOrigin = origin.replace(/\/$/, "");
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    console.warn("Blocked origin:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Socket.IO server
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST"],
+    credentials: true
   },
-  transports: ["websocket", "polling"]
+  transports: ["websocket", "polling"],
+  pingInterval: 25000,
+  pingTimeout: 20000,
+  connectTimeout: 20000
 });
 
 // API routes
@@ -44,17 +62,44 @@ app.use("/api/requests", require("./routes/requests"));
 // userId -> Set of socket IDs
 const onlineUsers = new Map();
 
+function emitOnlineUsers() {
+  io.emit("online-users", Array.from(onlineUsers.keys()));
+}
+
+// Socket connections
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
 
-  // Register a user's socket
+  // Register user after connection
   socket.on("user-online", (userId) => {
     if (!userId) return;
 
     const id = String(userId);
 
+    // Avoid duplicate registration for the same socket
+    if (socket.data.userId === id) {
+      emitOnlineUsers();
+      return;
+    }
+
+    // Remove previous registration if this socket changes user
+    if (socket.data.userId) {
+      const previousId = socket.data.userId;
+      const previousSockets = onlineUsers.get(previousId);
+
+      if (previousSockets) {
+        previousSockets.delete(socket.id);
+
+        if (previousSockets.size === 0) {
+          onlineUsers.delete(previousId);
+        }
+      }
+
+      void socket.leave(`user:${previousId}`);
+    }
+
     socket.data.userId = id;
-    socket.join(`user:${id}`);
+    void socket.join(`user:${id}`);
 
     if (!onlineUsers.has(id)) {
       onlineUsers.set(id, new Set());
@@ -62,72 +107,94 @@ io.on("connection", (socket) => {
 
     onlineUsers.get(id).add(socket.id);
 
-    io.emit("online-users", Array.from(onlineUsers.keys()));
+    console.log(`User ${id} is online`);
+
+    emitOnlineUsers();
   });
 
-  // Send a message to every active socket of the receiver
+  // Send messages to all active sockets of receiver
   socket.on("send-message", (message) => {
     if (!message?.receiverId) return;
 
-    io.to(`user:${message.receiverId}`)
-      .emit("receive-message", message);
+    const receiverId = String(message.receiverId);
+
+    io.to(`user:${receiverId}`).emit(
+      "receive-message",
+      message
+    );
   });
 
   // Typing indicator
-  socket.on("typing", ({ senderId, receiverId } = {}) => {
+  socket.on("typing", (data = {}) => {
+    const { senderId, receiverId } = data;
+
     if (!receiverId) return;
 
-    io.to(`user:${receiverId}`)
-      .emit("typing", senderId);
+    io.to(`user:${String(receiverId)}`).emit(
+      "typing",
+      senderId
+    );
   });
 
-  socket.on("stop-typing", ({ senderId, receiverId } = {}) => {
+  socket.on("stop-typing", (data = {}) => {
+    const { senderId, receiverId } = data;
+
     if (!receiverId) return;
 
-    io.to(`user:${receiverId}`)
-      .emit("stop-typing", senderId);
+    io.to(`user:${String(receiverId)}`).emit(
+      "stop-typing",
+      senderId
+    );
   });
 
   // Delete message for everyone
-  socket.on(
-    "delete-message-everyone",
-    ({ messageId, receiverId } = {}) => {
-      if (!receiverId) return;
+  socket.on("delete-message-everyone", (data = {}) => {
+    const { messageId, receiverId } = data;
 
-      io.to(`user:${receiverId}`)
-        .emit("message-deleted-everyone", messageId);
-    }
-  );
+    if (!receiverId || !messageId) return;
+
+    io.to(`user:${String(receiverId)}`).emit(
+      "message-deleted-everyone",
+      messageId
+    );
+  });
 
   // Clear conversation
-  socket.on("clear-chat", ({ receiverId } = {}) => {
+  socket.on("clear-chat", (data = {}) => {
+    const { receiverId } = data;
+
     if (!receiverId) return;
 
-    io.to(`user:${receiverId}`)
-      .emit("chat-cleared");
+    io.to(`user:${String(receiverId)}`).emit(
+      "chat-cleared"
+    );
   });
 
   // New contact request
-  socket.on("send-request", ({ receiverId } = {}) => {
+  socket.on("send-request", (data = {}) => {
+    const { receiverId } = data;
+
     if (!receiverId) return;
 
-    io.to(`user:${receiverId}`)
-      .emit("new-request");
+    io.to(`user:${String(receiverId)}`).emit(
+      "new-request"
+    );
   });
 
   // Remove contact
-  socket.on(
-    "remove-contact",
-    ({ removedUserId, byUserId } = {}) => {
-      if (!removedUserId) return;
+  socket.on("remove-contact", (data = {}) => {
+    const { removedUserId, byUserId } = data;
 
-      io.to(`user:${removedUserId}`)
-        .emit("contact-removed", byUserId);
-    }
-  );
+    if (!removedUserId) return;
 
-  // Handle disconnect
-  socket.on("disconnect", () => {
+    io.to(`user:${String(removedUserId)}`).emit(
+      "contact-removed",
+      byUserId
+    );
+  });
+
+  // Disconnect handling
+  socket.on("disconnect", (reason) => {
     const userId = socket.data.userId;
 
     if (userId && onlineUsers.has(userId)) {
@@ -135,15 +202,31 @@ io.on("connection", (socket) => {
 
       userSockets.delete(socket.id);
 
+      // Only mark offline when every socket for this user is gone
       if (userSockets.size === 0) {
         onlineUsers.delete(userId);
+        console.log(`User ${userId} is offline`);
       }
     }
 
-    io.emit("online-users", Array.from(onlineUsers.keys()));
+    emitOnlineUsers();
 
-    console.log("Socket disconnected:", socket.id);
+    console.log(
+      "Socket disconnected:",
+      socket.id,
+      "Reason:",
+      reason
+    );
   });
+
+  socket.on("connect_error", (error) => {
+    console.error("Socket connection error:", error.message);
+  });
+});
+
+// Basic health check
+app.get("/", (req, res) => {
+  res.status(200).send("Chat server is running");
 });
 
 // Start server after MongoDB connects
@@ -153,10 +236,29 @@ mongoose.connect(process.env.MONGO_URI)
 
     const PORT = process.env.PORT || 5000;
 
-    server.listen(PORT, () => {
+    server.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on port ${PORT}`);
+      console.log("Allowed frontend origins:", allowedOrigins);
     });
   })
-  .catch((err) => {
-    console.error("DB connection error:", err);
+  .catch((error) => {
+    console.error("MongoDB connection error:", error);
+    process.exit(1);
   });
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received. Closing server...");
+
+  void io.close(() => {
+    server.close(async () => {
+      try {
+        await mongoose.connection.close(false);
+        process.exit(0);
+      } catch (error) {
+        console.error("MongoDB shutdown error:", error);
+        process.exit(1);
+      }
+    });
+  });
+});
