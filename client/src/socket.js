@@ -6,6 +6,8 @@ const SERVER_URL = (
   "http://localhost:5000"
 ).replace(/\/$/, "");
 
+console.log("Socket server URL:", SERVER_URL);
+
 export const socket = io(SERVER_URL, {
   autoConnect: false,
 
