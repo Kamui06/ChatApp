@@ -86,15 +86,23 @@ export default function Chat() {
   useEffect(() => {
     if (!me?._id) return;
 
+    console.log("Initializing Socket.IO...");
+    console.log("User ID:", me._id);
+    console.log("Socket URL:", process.env.REACT_APP_SERVER_URL);
+    console.log("Currently connected:", socket.connected);
+
     const myId = String(me._id);
 
     // Register the user whenever the socket connects or reconnects.
     const handleConnect = () => {
-      console.log("Socket connected:", socket.id);
+      console.log("================================");
+      console.log("SOCKET CONNECTED SUCCESSFULLY");
+      console.log("Socket ID:", socket.id);
+      console.log("Logged-in user:", myId);
+      console.log("================================");
 
       socket.emit("user-online", myId);
 
-      // Refresh the currently selected conversation after reconnecting.
       const currentUser = selectedUserRef.current;
 
       if (currentUser?._id) {
@@ -122,7 +130,11 @@ export default function Chat() {
     };
 
     const handleConnectError = (err) => {
-      console.error("Socket connection error:", err.message);
+      console.error("================================");
+      console.error("SOCKET CONNECTION FAILED");
+      console.error("Error:", err.message);
+      console.error("Server URL:", process.env.REACT_APP_SERVER_URL);
+      console.error("================================");
     };
 
     // Update online users.
