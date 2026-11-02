@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 
 const express = require("express");
@@ -9,104 +10,153 @@ const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://chatapp-coral-chi.vercel.app" // add this after deploying to Vercel
-];
+// Frontend origins allowed to connect
+const allowedOrigins = (
+  process.env.CLIENT_URLS ||
+  "http://localhost:3000,https://chatapp-coral-chi.vercel.app"
+)
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ["GET", "POST", "PUT", "DELETE"]
+}));
+
+app.use(express.json());
+
+// Socket.IO server
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"]
-  }
+  },
+  transports: ["websocket", "polling"]
 });
 
-app.use(cors({ origin: allowedOrigins }));
-app.use(express.json());
-
-// Routes
+// API routes
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/messages", require("./routes/messages"));
 app.use("/api/contacts", require("./routes/contacts"));
 app.use("/api/requests", require("./routes/requests"));
 
-// Socket.io - track online users
-const onlineUsers = new Map(); // userId -> socketId
+// userId -> Set of socket IDs
+const onlineUsers = new Map();
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
 
+  // Register a user's socket
   socket.on("user-online", (userId) => {
-    onlineUsers.set(userId, socket.id);
+    if (!userId) return;
+
+    const id = String(userId);
+
+    socket.data.userId = id;
+    socket.join(`user:${id}`);
+
+    if (!onlineUsers.has(id)) {
+      onlineUsers.set(id, new Set());
+    }
+
+    onlineUsers.get(id).add(socket.id);
+
     io.emit("online-users", Array.from(onlineUsers.keys()));
   });
 
+  // Send a message to every active socket of the receiver
   socket.on("send-message", (message) => {
-    const receiverSocketId = onlineUsers.get(message.receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("receive-message", message);
-    }
+    if (!message?.receiverId) return;
+
+    io.to(`user:${message.receiverId}`)
+      .emit("receive-message", message);
   });
 
-  socket.on("typing", ({ senderId, receiverId }) => {
-    const receiverSocketId = onlineUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("typing", senderId);
-    }
+  // Typing indicator
+  socket.on("typing", ({ senderId, receiverId } = {}) => {
+    if (!receiverId) return;
+
+    io.to(`user:${receiverId}`)
+      .emit("typing", senderId);
   });
 
-  socket.on("stop-typing", ({ senderId, receiverId }) => {
-    const receiverSocketId = onlineUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("stop-typing", senderId);
-    }
+  socket.on("stop-typing", ({ senderId, receiverId } = {}) => {
+    if (!receiverId) return;
+
+    io.to(`user:${receiverId}`)
+      .emit("stop-typing", senderId);
   });
 
-  socket.on("delete-message-everyone", ({ messageId, receiverId }) => {
-    const receiverSocketId = onlineUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("message-deleted-everyone", messageId);
+  // Delete message for everyone
+  socket.on(
+    "delete-message-everyone",
+    ({ messageId, receiverId } = {}) => {
+      if (!receiverId) return;
+
+      io.to(`user:${receiverId}`)
+        .emit("message-deleted-everyone", messageId);
     }
+  );
+
+  // Clear conversation
+  socket.on("clear-chat", ({ receiverId } = {}) => {
+    if (!receiverId) return;
+
+    io.to(`user:${receiverId}`)
+      .emit("chat-cleared");
   });
 
-  socket.on("clear-chat", ({ receiverId }) => {
-    const receiverSocketId = onlineUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("chat-cleared");
-    }
+  // New contact request
+  socket.on("send-request", ({ receiverId } = {}) => {
+    if (!receiverId) return;
+
+    io.to(`user:${receiverId}`)
+      .emit("new-request");
   });
 
-  socket.on("send-request", ({ receiverId }) => {
-    const receiverSocketId = onlineUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("new-request");
-    }
-  });
+  // Remove contact
+  socket.on(
+    "remove-contact",
+    ({ removedUserId, byUserId } = {}) => {
+      if (!removedUserId) return;
 
-  socket.on("remove-contact", ({ removedUserId, byUserId }) => {
-    const targetSocketId = onlineUsers.get(removedUserId);
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("contact-removed", byUserId);
+      io.to(`user:${removedUserId}`)
+        .emit("contact-removed", byUserId);
     }
-  });
+  );
 
+  // Handle disconnect
   socket.on("disconnect", () => {
-    for (let [userId, socketId] of onlineUsers) {
-      if (socketId === socket.id) {
+    const userId = socket.data.userId;
+
+    if (userId && onlineUsers.has(userId)) {
+      const userSockets = onlineUsers.get(userId);
+
+      userSockets.delete(socket.id);
+
+      if (userSockets.size === 0) {
         onlineUsers.delete(userId);
-        break;
       }
     }
+
     io.emit("online-users", Array.from(onlineUsers.keys()));
+
     console.log("Socket disconnected:", socket.id);
   });
 });
 
-mongoose
-  .connect(process.env.MONGO_URI)
+// Start server after MongoDB connects
+mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB connected");
+
     const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   })
-  .catch((err) => console.error("DB connection error:", err));
+  .catch((err) => {
+    console.error("DB connection error:", err);
+  });
